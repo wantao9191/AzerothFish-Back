@@ -8,3 +8,5 @@ node_modules
 .env.test
 .env.production
 .next
+docker-compose.yml
+Dockerfile
