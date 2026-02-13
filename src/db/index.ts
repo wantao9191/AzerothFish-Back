@@ -8,8 +8,16 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is not set");
 }
 
-const pool = new Pool({
-  connectionString: connectionString,
-});
+const globalQueryClient = global as unknown as { dbPool: Pool };
+
+const pool =
+  globalQueryClient.dbPool ||
+  new Pool({
+    connectionString: connectionString,
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  globalQueryClient.dbPool = pool;
+}
 
 export const db = drizzle(pool, { schema });

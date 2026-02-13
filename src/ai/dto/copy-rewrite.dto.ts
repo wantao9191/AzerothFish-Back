@@ -39,8 +39,14 @@ export interface CopyRewriteInput {
 
 export interface CopyRewriteOutput {
     /**
-     * 生成的最终文案
-     * e.g. "今天的咖啡真好喝... #下午茶 #生活"
+     * 生成的范文内容（用于文档生成）
+     * e.g. 根据学生作文改写的规范范文
      */
     copy: string;
+
+    /**
+     * 作文点评内容（用于展示告知）
+     * e.g. 对学生作文的优缺点分析、建议等
+     */
+    review: string;
 }

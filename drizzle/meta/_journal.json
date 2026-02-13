@@ -15,6 +15,20 @@
       "when": 1770692046494,
       "tag": "0001_clean_dexter_bennett",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770952582325,
+      "tag": "0002_lonely_ben_grimm",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1770953852607,
+      "tag": "0004_light_boom_boom",
+      "breakpoints": true
     }
   ]
 }

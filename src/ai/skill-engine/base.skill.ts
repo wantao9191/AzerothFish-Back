@@ -30,22 +30,90 @@ export abstract class BaseSkill<I, O> {
   protected abstract buildSystemPrompt(): string;
 
   /**
-   * [定义] 执行技能
+   * [定义] 执行技能（非流式）
    * 包含完整的生命周期：开始计时 -> 构建 Prompt -> 调用 LLM -> 记录指标 -> 返回结果。
    */
   async execute(input: I): Promise<O> {
     const start = Date.now();
+    const systemPrompt = this.buildSystemPrompt();
 
-    const result = await this.llm.run(
-      this.buildSystemPrompt(),
-      input
-    );
+    try {
+      const result = await this.llm.run(systemPrompt, input);
 
-    await this.metrics.record({
-      skill: this.name,
-      duration: Date.now() - start
-    });
+      await this.metrics.record({
+        skill: this.name,
+        duration: Date.now() - start,
+        success: true,
+        metadata: { 
+          input, 
+          systemPrompt,
+          output: result 
+        }
+      });
 
-    return result;
+      return result;
+    } catch (error: any) {
+      await this.metrics.record({
+        skill: this.name,
+        duration: Date.now() - start,
+        success: false,
+        error: error.message || String(error),
+        metadata: { 
+          input,
+          systemPrompt
+        }
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * [定义] 执行技能（流式）
+   * 支持流式输出，每生成一个 token 就通过回调函数返回。
+   * 
+   * @param input 输入参数
+   * @param onChunk 接收每个 token 的回调函数
+   * @returns 完整的输出结果
+   */
+  async executeStream(
+    input: I, 
+    onChunk?: (chunk: string) => void | Promise<void>
+  ): Promise<O> {
+    const start = Date.now();
+    const systemPrompt = this.buildSystemPrompt();
+
+    try {
+      // 检查适配器是否支持流式调用
+      if (!this.llm.runStream) {
+        throw new Error(`LLM adapter does not support streaming`);
+      }
+
+      const result = await this.llm.runStream(systemPrompt, input, onChunk);
+
+      await this.metrics.record({
+        skill: this.name,
+        duration: Date.now() - start,
+        success: true,
+        metadata: { 
+          input, 
+          systemPrompt,
+          output: result 
+        }
+      });
+
+      return result;
+    } catch (error: any) {
+      await this.metrics.record({
+        skill: this.name,
+        duration: Date.now() - start,
+        success: false,
+        error: error.message || String(error),
+        metadata: { 
+          input,
+          systemPrompt
+        }
+      });
+      throw error;
+    }
   }
 }

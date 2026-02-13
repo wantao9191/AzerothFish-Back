@@ -1,5 +1,5 @@
 import { BaseSkill } from "./base.skill";
-import { FileGenerateInput, FileGenerateOutput } from "../dto/file-generate.dto";   
+import { FileGenerateInput, FileGenerateOutput } from "../dto/file-generate.dto";
 // 简单的 DTO 定义 (也可以放到单独的文件中)
 
 
@@ -29,7 +29,13 @@ export class FileGenerateSkill extends BaseSkill<
         return `
 你是一个文档格式化助手。
 请将输入的内容整理为标准的格式。
-返回 JSON: { "file_path": "建议的文件名", "content": "格式化后的内容" }
+返回 JSON: [
+{ "file_path": "建议的文件名", "content": "格式化后的内容" },
+{ "file_path": "建议的文件名", "content": "格式化后的内容" },
+ ...
+ ]
+请确保返回的 JSON 符合以下结构：
+{ "file_path": "string", "content": "string" }
 `;
     }
 

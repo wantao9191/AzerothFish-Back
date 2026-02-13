@@ -24,6 +24,12 @@ export class ImageParseSkill extends BaseSkill<
 你是一个专业的视觉分析 AI。
 请仅返回严格的 JSON 格式。
 提取图片中检测到的主体文本(detected_text)。
+图片可能有多个，请分别提取每个图片中的检测到的主体文本,根据上下文判断是否是同一个主体，如果是同一个主体，请合并成一个主体，如果不是同一个主体，请分别提取。
+如果图片中没有检测到主体文本，请返回空数组。
+
+{
+  "detected_text": ["string"]
+}
 `;
   }
 }

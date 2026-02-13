@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, integer, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, integer, uniqueIndex, index, jsonb } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // 1. 用户表
@@ -54,6 +54,19 @@ export const readingProgress = pgTable("reading_progress", {
   // 确保一个用户对一本书只有一条进度记录
   unq: uniqueIndex("user_book_progress_idx").on(t.openid, t.bookId),
 }));
+
+// 5. AI Metrics 表
+export const aiMetrics = pgTable("ai_metrics", {
+  id: serial("id").primaryKey(),
+  skill: text("skill").notNull(),
+  duration: integer("duration").notNull(), // 毫秒
+  tokens: integer("tokens"), // token 消耗 (可选)
+  model: text("model"), // 模型名称 (可选)
+  success: integer("success").default(1), // 1: 成功, 0: 失败
+  error: text("error"), // 错误信息
+  createdAt: timestamp("created_at").defaultNow(),
+  metadata: jsonb("metadata"), // JSON
+});
 
 // 定义关系 (Relations)
 export const booksRelations = relations(books, ({ many }) => ({
