@@ -1,11 +1,9 @@
-import officegen from 'officegen';
-import PDFDocument from 'pdfkit';
-import { Readable } from 'stream';
 import { FileGenerateOutput } from '@/ai/dto/file-generate.dto';
 
 /**
  * 文档生成服务
  * 使用固定模板，将纯文本内容生成各种格式的文档
+ * 注意：officegen 和 pdfkit 使用动态导入，避免编译时依赖问题
  */
 export class DocumentGenerator {
     /**
@@ -50,8 +48,10 @@ export class DocumentGenerator {
      * 生成 DOCX 文档
      */
     private static async generateDocx(output: FileGenerateOutput): Promise<Buffer> {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             try {
+                // 动态导入 officegen，避免编译时依赖问题
+                const officegen = (await import('officegen')).default;
                 const docx = officegen('docx');
                 const chunks: Buffer[] = [];
 
@@ -156,8 +156,10 @@ export class DocumentGenerator {
      * 生成 PDF 文档
      */
     private static async generatePdf(output: FileGenerateOutput): Promise<Buffer> {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             try {
+                // 动态导入 pdfkit，避免编译时依赖问题
+                const PDFDocument = (await import('pdfkit')).default;
                 const chunks: Buffer[] = [];
                 const doc = new PDFDocument({
                     size: 'A4',

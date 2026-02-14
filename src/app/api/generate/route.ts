@@ -114,27 +114,33 @@ export async function POST(request: NextRequest) {
         // 检查是否需要直接返回文件下载（通过 header 控制）
         const returnFile = request.headers.get("x-return-file") === "true";
         
-        if (returnFile && result.articles.length > 0) {
-            // 导入文档生成器
-            const { DocumentGenerator } = await import("@/lib/document-generator");
-            
-            // 生成文档文件（直接从纯文本内容生成）
-            const article = result.articles[0];
-            const buffer = await DocumentGenerator.generateFromText(article.content, format);
-            
-            // 返回文件
-            const contentType = getFileContentType(format);
-            const filename = getFileFilename(format);
-            
-            return new Response(new Uint8Array(buffer), {
-                headers: {
-                    'Content-Type': contentType,
-                    'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
-                    'Content-Length': buffer.length.toString(),
-                    'X-Review': encodeURIComponent(article.review || ""), // 点评放在 header 中
-                },
-            });
-        }
+        // if (returnFile && result.articles.length > 0) {
+        //     try {
+        //         // 导入文档生成器
+        //         const { DocumentGenerator } = await import("@/lib/document-generator");
+                
+        //         // 生成文档文件（直接从纯文本内容生成）
+        //         const article = result.articles[0];
+        //         const buffer = await DocumentGenerator.generateFromText(article.content, format);
+                
+        //         // 返回文件
+        //         const contentType = getFileContentType(format);
+        //         const filename = getFileFilename(format);
+                
+        //         return new Response(new Uint8Array(buffer), {
+        //             headers: {
+        //                 'Content-Type': contentType,
+        //                 'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+        //                 'Content-Length': buffer.length.toString(),
+        //                 'X-Review': encodeURIComponent(article.review || ""), // 点评放在 header 中
+        //             },
+        //         });
+        //     } catch (docError) {
+        //         // 文档生成失败，记录错误但不中断流程
+        //         console.error("文档生成失败，回退到 JSON 输出:", docError);
+        //         // 继续执行，返回 JSON 格式（不返回错误，让用户至少能看到内容）
+        //     }
+        // }
         
         // 返回 JSON 格式（默认）
         return success(result);
