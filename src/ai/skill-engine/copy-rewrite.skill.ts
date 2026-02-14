@@ -44,7 +44,7 @@ export class CopyRewriteSkill extends BaseSkill<
 6. 字数控制在【max_length】左右
 7. 符合【subject】学科的写作规范
 
-## 第二部分：作文点评（review）
+## 第二部分：作文点评（review）,如果【use_review】为false，则不生成点评，点评字数严格控制在60字以内
 
 点评内容结构：
 使用自然的教师语言，按以下逻辑组织（不要生硬分段）：

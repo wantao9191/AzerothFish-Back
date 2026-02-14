@@ -1,7 +1,5 @@
 import { ImageParseSkill } from "../skill-engine/image-parse.skill";
 import { CopyRewriteSkill } from "../skill-engine/copy-rewrite.skill";
-import { FileGenerateSkill } from "../skill-engine/file-generate.skill";
-import { FileGenerateOutput } from "../dto/file-generate.dto";
 
 export type Format = "markdown" | "html" | "txt" | 'docx' | 'pdf';
 
@@ -12,6 +10,10 @@ export interface ImageToPostOptions {
   format: Format;
   detail_level: "low" | "medium" | "high";
   max_length: number;
+  /** 是否生成点评（仅在 enable_rewrite=true 时生效） */
+  enable_review: boolean;
+  /** 是否启用AI改写生成范文（false时直接使用OCR文本） */
+  enable_rewrite: boolean;
 }
 
 /**
@@ -19,15 +21,11 @@ export interface ImageToPostOptions {
  */
 export interface ProgressEvent {
   /** 事件类型 */
-  type: 'step_start' | 'step_progress' | 'step_complete' | 'complete' | 'error';
+  type: 'step_complete' | 'complete' | 'error' | 'step_start';
   /** 当前步骤 */
-  step: 'image_parse' | 'copy_rewrite' | 'file_generate';
-  /** 进度百分比 (0-100) */
-  progress: number;
+  step: 'image_parse' | 'copy_rewrite';
   /** 步骤数据 */
   data?: any;
-  /** 流式文本片段（仅在 step_progress 时存在） */
-  chunk?: string;
   /** 错误信息（仅在 error 时存在） */
   error?: string;
 }
@@ -37,10 +35,10 @@ export interface ProgressEvent {
  */
 export interface ArticleResult {
   /**
-   * 范文文件（用于文档生成）
+   * 范文内容（纯文本）
    */
-  file: FileGenerateOutput;
-  
+  content: string;
+
   /**
    * 作文点评（用于展示告知）
    */
@@ -61,15 +59,22 @@ export interface ImageToPostResult {
  * 编排层，将多个 Skill 串联起来完成一个具体的业务需求。
  *
  * [用途]
- * 接收作文图片 URL，依次调用：
+ * 接收作文图片 URL，根据配置执行不同流程：
+ * 
+ * 完整模式（enable_rewrite=true）：
  * 1. ImageParseSkill (解析图片，提取文字)
- * 2. CopyRewriteSkill (生成范文和点评)
+ * 2. CopyRewriteSkill (生成范文和点评，enable_review 控制是否生成点评)
  * 3. FileGenerateSkill (生成范文文件)
- * 最终返回范文文件和点评内容。
+ * 
+ * 简化模式（enable_rewrite=false）：
+ * 1. ImageParseSkill (解析图片，提取文字)
+ * 2. FileGenerateSkill (直接将OCR文本生成文件)
+ * 注：此模式下 enable_review 参数无效，不会生成点评
  *
  * [为什么这样做]
  * 实现了业务逻辑与 AI 能力的分离。
  * 可以在这里处理数据流转（把上一步的输出传给下一步），而不需要修改 Skill 本身。
+ * 灵活支持不同场景：快速OCR提取 vs 深度AI改写批改。
  * 
  * [返回结构]
  * 返回数组结构，支持未来扩展多篇作文批量处理。
@@ -78,8 +83,7 @@ export interface ImageToPostResult {
 export class ImageToPostWorkflow {
   constructor(
     private imageParse: ImageParseSkill,
-    private copyRewrite: CopyRewriteSkill,
-    private fileGenerate: FileGenerateSkill
+    private copyRewrite: CopyRewriteSkill
   ) { }
 
   /**
@@ -93,102 +97,90 @@ export class ImageToPostWorkflow {
     options: ImageToPostOptions,
     onProgress?: (event: ProgressEvent) => void | Promise<void>
   ): Promise<ImageToPostResult> {
-    const { imageUrls, subject, level, format, detail_level, max_length } = options;
-    
+    const { imageUrls, subject, level, format, detail_level, max_length, enable_review, enable_rewrite } = options;
+
     try {
       // ========== Step 1: 解析图片 ==========
-      await onProgress?.({ 
-        type: 'step_start', 
-        step: 'image_parse', 
-        progress: 0 
+      await onProgress?.({
+        type: 'step_start',
+        step: 'image_parse'
       });
-
       const imageData = await this.imageParse.execute({
         image_urls: imageUrls,
         extract_text: true,
         detail_level: detail_level
       });
 
-      await onProgress?.({ 
-        type: 'step_complete', 
-        step: 'image_parse', 
-        progress: 20,
-        data: { 
-          extracted_text: imageData.detected_text 
+      await onProgress?.({
+        type: 'step_complete',
+        step: 'image_parse',
+        data: {
+          extracted_text: imageData.detected_text || ""
         }
       });
 
-      // ========== Step 2: 生成范文和点评（流式） ==========
-      await onProgress?.({ 
-        type: 'step_start', 
-        step: 'copy_rewrite', 
-        progress: 20 
-      });
-
-      let accumulatedContent = "";
-
-      const writtenContent = await this.copyRewrite.executeStream(
-        {
+      // 根据 enable_rewrite 决定是否使用AI改写
+      if (enable_rewrite) {
+        // ========== Step 2: 生成范文和点评（AI改写模式） ==========
+        await onProgress?.({
+          type: 'step_start',
+          step: 'copy_rewrite'
+        });
+        const writtenContent = await this.copyRewrite.execute({
           image_analysis: imageData,
+          use_review: enable_review,
           subject: subject,
           level: level,
           max_length: max_length || 500
-        },
-        // 流式回调：每生成一段文字就推送
-        async (chunk: string) => {
-          accumulatedContent += chunk;
-          await onProgress?.({
-            type: 'step_progress',
-            step: 'copy_rewrite',
-            progress: 20 + Math.min(60, Math.floor(accumulatedContent.length / 10)), // 动态进度
-            chunk: chunk // 传递文字片段
-          });
-        }
-      );
+        });
 
-      await onProgress?.({ 
-        type: 'step_complete', 
-        step: 'copy_rewrite', 
-        progress: 80,
-        data: { 
-          copy: writtenContent.copy,
-          review: writtenContent.review 
-        }
-      });
+        await onProgress?.({
+          type: 'step_complete',
+          step: 'copy_rewrite',
+          data: {
+            copy: writtenContent.copy || "",
+            review: writtenContent.review || ""
+          }
+        });
 
-      // ========== Step 3: 生成文件 ==========
-      await onProgress?.({ 
-        type: 'step_start', 
-        step: 'file_generate', 
-        progress: 80 
-      });
+        // ========== 完成 ==========
+        const result = {
+          articles: [
+            {
+              content: writtenContent.copy,
+              review: writtenContent.review || ""
+            }
+          ]
+        };
 
-      const file = await this.fileGenerate.execute({
-        format: format,
-        content: writtenContent.copy ?? ""
-      });
+        await onProgress?.({
+          type: 'complete',
+          step: 'copy_rewrite',
+          data: result
+        });
 
-      await onProgress?.({ 
-        type: 'step_complete', 
-        step: 'file_generate', 
-        progress: 100,
-        data: { file }
-      });
+        return result;
+      }
 
-      // ========== 完成 ==========
+      // ========== 不使用AI改写，直接使用OCR文本 ==========
+      // 检查是否成功提取到文本
+      if (!imageData.detected_text || imageData.detected_text.length === 0) {
+        throw new Error("未能从图片中提取到文本内容，请确保图片清晰且包含文字");
+      }
+
+      // ========== 完成（简化模式，无点评） ==========
       const result = {
         articles: [
           {
-            file: file,
-            review: writtenContent.review
+            content: imageData.detected_text.join("\n"),
+            review: "" // 简化模式下不生成点评
           }
         ]
       };
 
-      await onProgress?.({ 
-        type: 'complete', 
-        step: 'file_generate', 
-        progress: 100,
+      await onProgress?.({
+        type: 'complete',
+        step: 'image_parse',
         data: result
       });
 
@@ -199,7 +191,6 @@ export class ImageToPostWorkflow {
       await onProgress?.({
         type: 'error',
         step: 'image_parse',
-        progress: 0,
         error: error.message || String(error)
       });
       throw error;

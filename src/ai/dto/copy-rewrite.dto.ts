@@ -35,6 +35,11 @@ export interface CopyRewriteInput {
      * e.g. 100, 200, 300
      */
     max_length: number;
+
+    /**
+     * 是否生成点评
+     */
+    use_review: boolean;
 }
 
 export interface CopyRewriteOutput {
